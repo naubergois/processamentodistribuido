@@ -1,0 +1,10 @@
+pyspark==3.5.0
+dask[complete]
+distributed
+kafka-python
+pandas
+numpy
+sqlalchemy
+fastparquet
+pyarrow
+textblob
