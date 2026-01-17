@@ -194,6 +194,7 @@ def create_notebook(filename, title, scenario, producer_code, consumer_code):
                     "    .format(\"kafka\") \\\n",
                     "    .option(\"kafka.bootstrap.servers\", \"localhost:9092\") \\\n",
                     "    .option(\"subscribe\", \"input-topic\") \\\n",
+                    "    .option(\"startingOffsets\", \"earliest\") \\\n",
                     "    .load()\n",
                     "\n",
                     "# Generic parsing - tailored in specific notebooks if needed, but here we assume JSON value\n",
