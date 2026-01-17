@@ -206,7 +206,7 @@ def create_notebook(filename, title, scenario, producer_code, consumer_code):
                     "    .outputMode(\"update\") \\\n",
                     "    .start()\n",
                     "\n",
-                    "query.awaitTermination()"
+                    "query.awaitTermination(60)"
                 ]
             },
             {
