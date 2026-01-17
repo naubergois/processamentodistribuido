@@ -108,6 +108,13 @@ The scripts persist data to:
 - **34. Enrichment**: Enriquecimento de Streams
 - **35. SQL Dashboard**: Processamento declarativo com Flink SQL
 
+### Phase 8: Big Data Ops (Spark + Elasticsearch + Presto)
+- **36. Log Analytics**: Pipeline de logs (Spark -> ES -> Presto)
+- **37. Product Catalog**: Busca Facetada (Spark -> ES)
+- **38. SIEM Threat Hunting**: Segurança em Tempo Real (Spark Streaming -> ES)
+- **39. Customer 360**: Agregação de Perfil (Spark -> ES)
+- **40. Hybrid Analytics**: Consultas Federadas (Presto JOIN ES + TPCH)
+
 ### Material Extra
 - **Kafka Avançado (Deep Dive)**: Tutorial detalhado sobre arquitetura Kafka (Log, Partições, Consumer Groups, Semântica de Entrega) - `notebooks/Kafka_Avancado_Colab.ipynb`
 
