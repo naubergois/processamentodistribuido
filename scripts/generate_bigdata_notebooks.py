@@ -3,7 +3,8 @@ import os
 
 def create_notebook(filename, title, description, code_cells):
     # Common Setup Cell for Big Data Stack
-    setup_code = [
+    # 1. Python Setup Cell
+    setup_python = [
         "# 1. Install Java 17 (Required for Trino)\n",
         "!apt-get install openjdk-17-jdk-headless -qq > /dev/null\n",
         "import os\n",
@@ -11,9 +12,13 @@ def create_notebook(filename, title, description, code_cells):
         "\n",
         "# 2. Install PySpark & Dependencies\n",
         "!pip install -q pyspark==3.5.0 elasticsearch==8.11.0\n",
-        "\n",
-        "# 3. Download & Start Elasticsearch 7.17 (Background)\n",
+        "print(\"Java and Spark installed.\")"
+    ]
+
+    # 2. Bash Setup Cell
+    setup_bash = [
         "%%bash\n",
+        "# 3. Download & Start Elasticsearch 7.17 (Background)\n",
         "if [ ! -d \"elasticsearch-7.17.9\" ]; then\n",
         "  wget -q https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.17.9-linux-x86_64.tar.gz\n",
         "  tar -xzf elasticsearch-7.17.9-linux-x86_64.tar.gz\n",
@@ -52,8 +57,11 @@ def create_notebook(filename, title, description, code_cells):
         "if [ ! -f \"trino\" ]; then\n",
         "  wget -q https://repo1.maven.org/maven2/io/trino/trino-cli/422/trino-cli-422-executable.jar -O trino\n",
         "  chmod +x trino\n",
-        "fi\n",
-        "\n",
+        "fi"
+    ]
+
+    # 3. Wait Logic Cell
+    setup_wait = [
         "print(\"Environment Setup Complete. Waiting for services to startup...\")\n",
         "import time\n",
         "time.sleep(60) # Wait 60s for ES and Trino to fully initialize"
@@ -76,7 +84,21 @@ def create_notebook(filename, title, description, code_cells):
                 "execution_count": None,
                 "metadata": {},
                 "outputs": [],
-                "source": setup_code
+                "source": setup_python
+            },
+            {
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": setup_bash
+            },
+            {
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": setup_wait
             }
         ],
         "metadata": {
