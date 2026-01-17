@@ -76,11 +76,18 @@ The scripts persist data to:
 10. **Manufacturing**: Predictive Maint (Dask)
 
 ### Phase 3: Services
-77. **Cybersecurity**: IDS (Spark)
-78. **Agriculture**: Irrigation (Dask)
-79. **Gaming**: Leaderboard (Spark)
-80. **Telecom**: Network Quality (Dask)
-81. **Retail**: Inventory (Spark)
+11. **Cybersecurity**: IDS (Spark)
+12. **Agriculture**: Irrigation (Dask)
+13. **Gaming**: Leaderboard (Spark)
+14. **Telecom**: Network Quality (Dask)
+15. **Retail**: Inventory (Spark)
+
+### Phase 4: Daily Life
+16. **Weather**: Heatwave Alerts (Dask)
+17. **Ride-Sharing**: Dynamic Pricing (Spark)
+18. **Hospitality**: Revenue Dash (Dask)
+19. **Insurance**: Risk Analysis (Spark)
+20. **Education**: Proctoring (Dask)
 
 ### Phase 6: Advanced Integrations
 - **21. E-commerce**: Recommendations (Spark + Redis + Mongo)
@@ -101,11 +108,6 @@ The scripts persist data to:
 - **34. Enrichment**: Enriquecimento de Streams
 - **35. SQL Dashboard**: Processamento declarativo com Flink SQL
 
+### Material Extra
+- **Kafka Avançado (Deep Dive)**: Tutorial detalhado sobre arquitetura Kafka (Log, Partições, Consumer Groups, Semântica de Entrega) - `notebooks/Kafka_Avancado_Colab.ipynb`
 
-
-### Phase 4: Daily Life
-16. **Weather**: Heatwave Alerts (Dask)
-17. **Ride-Sharing**: Dynamic Pricing (Spark)
-18. **Hospitality**: Revenue Dash (Dask)
-19. **Insurance**: Risk Analysis (Spark)
-20. **Education**: Proctoring (Dask)
