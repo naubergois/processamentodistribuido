@@ -43,9 +43,10 @@ def create_notebook(filename, title, description, code_cells):
         "  echo 'elasticsearch.default-schema-name=default' >> trino-server-422/etc/catalog/es.properties\n",
         "  # TPCH Catalog\n",
         "  echo 'connector.name=tpch' > trino-server-422/etc/catalog/tpch.properties\n",
+        "  chown -R daemon:daemon trino-server-422\n",
         "fi\n",
-        "# Start Trino\n",
-        "./trino-server-422/bin/launcher start\n",
+        "# Start Trino as daemon (launcher forbids root)\n",
+        "sudo -u daemon ./trino-server-422/bin/launcher start\n",
         "\n",
         "# 5. Install Trino CLI\n",
         "if [ ! -f \"trino\" ]; then\n",
@@ -55,7 +56,7 @@ def create_notebook(filename, title, description, code_cells):
         "\n",
         "print(\"Environment Setup Complete. Waiting for services to startup...\")\n",
         "import time\n",
-        "time.sleep(30) # Wait for ES and Trino"
+        "time.sleep(60) # Wait 60s for ES and Trino to fully initialize"
     ]
 
     notebook = {
