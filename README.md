@@ -94,6 +94,14 @@ The scripts persist data to:
 - **29. Healthcare**: Monitor V2 (Spark + Redis + Mongo)
 - **30. Cyber Security**: Threat Intel (Spark + Redis + Mongo)
 
+### Phase 7: Apache Flink (PyFlink)
+- **31. WordCount**: Contador de palavras (Batch/Stream)
+- **32. Fraud Detection**: Filtro de transações suspeitas
+- **33. IoT Windows**: Janelas de tempo (Tumbling)
+- **34. Enrichment**: Enriquecimento de Streams
+- **35. SQL Dashboard**: Processamento declarativo com Flink SQL
+
+
 
 ### Phase 4: Daily Life
 16. **Weather**: Heatwave Alerts (Dask)
