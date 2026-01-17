@@ -30,16 +30,18 @@ kafka-server-start.sh config/server.properties
 
 ## Running Examples
 
-### Option 1: Google Colab (Notebooks)
-Upload any `.ipynb` file from `notebooks/` to Colab. 
+### Como Executar (Google Colab)
+1. Faça upload do notebook desejado (`notebooks/*.ipynb`) para o Google Colab.
+2. Execute todas as células (`Runtime > Run all`).
+3. O notebook instalará automaticamente o Java, Spark, Kafka, Redis e Mongo necessários.
 
-**Note for Spark Notebooks:**
-The Spark notebooks have been updated to write consumer code to `kafka_consumer.py` and execute via `spark-submit` for stability.
-- Ensure you run the `Installation` and `Start Kafka` cells first.
+### Como Executar (Localmente)
+Para os scripts Python (`scripts/*.py`):
+1. Instale as dependências: `pip install -r requirements.txt`
+2. Garanta que Java 11+ esteja instalado.
+3. Execute: `python3 scripts/01_aviation_telemetry.py`
+
 - The final cell triggers the streaming job using `!spark-submit`.
-
-### Option 2: Local Python Scripts
-Run the scripts directly. They will start a background producer (simulator) and a consumer/processor.
 
 **Example (Dask - No Kafka needed):**
 ```bash
@@ -74,11 +76,24 @@ The scripts persist data to:
 10. **Manufacturing**: Predictive Maint (Dask)
 
 ### Phase 3: Services
-11. **Cybersecurity**: IDS (Spark)
-12. **Agriculture**: Irrigation (Dask)
-13. **Gaming**: Leaderboard (Spark)
-14. **Telecom**: Network Quality (Dask)
-15. **Retail**: Inventory (Spark)
+77. **Cybersecurity**: IDS (Spark)
+78. **Agriculture**: Irrigation (Dask)
+79. **Gaming**: Leaderboard (Spark)
+80. **Telecom**: Network Quality (Dask)
+81. **Retail**: Inventory (Spark)
+
+### Phase 6: Advanced Integrations
+- **21. E-commerce**: Recommendations (Spark + Redis + Mongo)
+- **22. Dynamic Pricing**: Real-time Pricing (Spark + Redis + Mongo)
+- **23. Fraud Detection**: Location Anomaly (Spark + Redis + Mongo)
+- **24. Smart Home**: IoT Monitoring (Spark + Redis + Mongo)
+- **25. Logistics**: Fleet Tracking (Spark + Redis + Mongo)
+- **26. Gaming**: Player State (Spark + Redis + Mongo)
+- **27. Finance**: Trading Bot (Spark + Redis + Mongo)
+- **28. Social Media**: Trend Counter (Spark + Redis + Mongo)
+- **29. Healthcare**: Monitor V2 (Spark + Redis + Mongo)
+- **30. Cyber Security**: Threat Intel (Spark + Redis + Mongo)
+
 
 ### Phase 4: Daily Life
 16. **Weather**: Heatwave Alerts (Dask)
