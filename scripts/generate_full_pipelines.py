@@ -46,7 +46,7 @@ def get_setup_env_block():
                 "!tar xf spark-3.5.0-bin-hadoop3.tgz\n",
                 "!wget -q https://archive.apache.org/dist/kafka/3.6.1/kafka_2.13-3.6.1.tgz\n",
                 "!tar xf kafka_2.13-3.6.1.tgz\n",
-                "!pip install -q findspark pyspark kafka-python redis pymongo elasticsearch==7.10.1 cassandra-driver minio \"numpy<2.0.0\"\n",
+                "!pip install -q \"numpy<2.0.0\" findspark pyspark kafka-python redis pymongo elasticsearch==7.10.1 cassandra-driver minio\n",
                 "\n",
                 "# Environment Variables\n",
                 "import os\n",
@@ -438,7 +438,7 @@ def get_nb62():
                 "r = redis.Redis()\n",
                 "print(f\"Traffic Status: {r.get('traffic:status')}\")\n",
                 "\n",
-                "m = Minio(\"127.0.0.1:9000\", access_key=\"minioadmin\", secret_key=\"minioadmin\", secure=False)\n",
+                "m = Minio(\"127.0.0.1:9010\", access_key=\"minioadmin\", secret_key=\"minioadmin\", secure=False)\n",
                 "print(f\"Archives: {len(list(m.list_objects('traffic-archive')))} files.\")"
             ]
         }
@@ -447,7 +447,34 @@ def get_nb62():
 
 # 63: SIEM
 def get_nb63():
-    setup = get_service_start_block(["kafka", "es", "minio"])
+    # Helper for Custom MinIO Setup (Port 9010)
+    setup = get_service_start_block(["kafka", "es"])
+    minio_custom = {
+        "cell_type": "code",
+        "metadata": {},
+        "source": [
+            "# Start MinIO on Custom Port 9010 (Shared with NB62 convention)\n",
+            "!wget -q https://dl.min.io/server/minio/release/linux-amd64/minio\n",
+            "!chmod +x minio\n",
+            "!mkdir -p /content/minio_data_nb63\n",
+            "!MINIO_ROOT_USER=minioadmin MINIO_ROOT_PASSWORD=minioadmin ./minio server /content/minio_data_nb63 --address \":9010\" --console-address \":9011\" &> minio_9010.log &\n",
+            "\n",
+            "# Wait for MinIO 9010\n",
+            "import time, socket, os\n",
+            "print('Waiting for MinIO on 9010...')\n",
+            "start = time.time()\n",
+            "while True:\n",
+            "    try:\n",
+            "        with socket.create_connection(('localhost', 9010), timeout=1): break\n",
+            "    except (OSError, ConnectionRefusedError):\n",
+            "        if time.time() - start > 120:\n",
+            "             if os.path.exists('minio_9010.log'): print(open('minio_9010.log').read())\n",
+            "             raise Exception('MinIO 9010 Failed')\n",
+            "        time.sleep(1)\n",
+            "print('MinIO 9010 Ready!')"
+        ]
+    }
+    setup.append(minio_custom)
     logic = [
         {
             "cell_type": "markdown",
