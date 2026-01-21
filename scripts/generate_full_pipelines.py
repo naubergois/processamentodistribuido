@@ -66,8 +66,8 @@ def get_service_start_block(services):
         desc.append("- **Kafka** (Zookeeper + Broker)")
         code.extend([
             "# Start Kafka\n",
-            "!!./kafka_2.13-3.6.1/bin/zookeeper-server-start.sh -daemon ./kafka_2.13-3.6.1/config/zookeeper.properties\n",
-            "!!./kafka_2.13-3.6.1/bin/kafka-server-start.sh -daemon ./kafka_2.13-3.6.1/config/server.properties\n"
+            "!./kafka_2.13-3.6.1/bin/zookeeper-server-start.sh -daemon ./kafka_2.13-3.6.1/config/zookeeper.properties\n",
+            "!./kafka_2.13-3.6.1/bin/kafka-server-start.sh -daemon ./kafka_2.13-3.6.1/config/server.properties\n"
         ])
     if "redis" in services:
         desc.append("- **Redis**")
@@ -94,17 +94,15 @@ def get_service_start_block(services):
             "!wget -q https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.10.2-linux-x86_64.tar.gz\n",
             "!tar -xzf elasticsearch-7.10.2-linux-x86_64.tar.gz\n",
             "!chown -R daemon:daemon elasticsearch-7.10.2\n",
-            "!!sudo -u daemon ES_JAVA_OPTS=\"-Xms512m -Xmx512m\" ./elasticsearch-7.10.2/bin/elasticsearch -d\n"
+            "!sudo -u daemon ES_JAVA_OPTS=\"-Xms512m -Xmx512m\" ./elasticsearch-7.10.2/bin/elasticsearch -d > es.log 2>&1 &\n"
         ])
     if "cassandra" in services:
         desc.append("- **Cassandra**")
         code.extend([
             "# Start Cassandra\n",
-            "!echo \"deb http://www.apache.org/dist/cassandra/debian 40x main\" | tee -a /etc/apt/sources.list.d/cassandra.sources.list\n",
-            "!curl https://downloads.apache.org/cassandra/KEYS | apt-key add -\n",
-            "!apt-get update -qq > /dev/null\n",
-            "!apt-get install cassandra -qq > /dev/null\n",
-            "!service cassandra start\n"
+            "!wget -q https://archive.apache.org/dist/cassandra/4.1.3/apache-cassandra-4.1.3-bin.tar.gz\n",
+            "!tar xf apache-cassandra-4.1.3-bin.tar.gz\n",
+            "!apache-cassandra-4.1.3/bin/cassandra -R > cassandra.log 2>&1 &\n"
         ])
     if "minio" in services:
         desc.append("- **MinIO**")
@@ -112,11 +110,12 @@ def get_service_start_block(services):
             "# Start MinIO\n",
             "!wget -q https://dl.min.io/server/minio/release/linux-amd64/minio\n",
             "!chmod +x minio\n",
-            "!./minio server /data --console-address \":9001\" &> minio.log &\n"
+            "!mkdir -p /content/minio_data\n",
+            "!MINIO_ROOT_USER=minioadmin MINIO_ROOT_PASSWORD=minioadmin ./minio server /content/minio_data --console-address \":9001\" &> minio.log &\n"
         ])
     
-    code.append("\nimport time, socket\n")
-    code.append("def wait_for_port(port, host='localhost', timeout=60):\n")
+    code.append("\nimport time, socket, os\n")
+    code.append("def wait_for_port(port, host='localhost', timeout=120):\n")
     code.append("    start_time = time.time()\n")
     code.append("    while True:\n")
     code.append("        try:\n")
@@ -125,14 +124,31 @@ def get_service_start_block(services):
     code.append("                return True\n")
     code.append("        except (OSError, ConnectionRefusedError):\n")
     code.append("            if time.time() - start_time > timeout:\n")
-    code.append("                print(f\"Timeout waiting for {host}:{port}\")\n")
-    code.append("                return False\n")
+    code.append("                print(f\"Timeout waiting for {host}:{port} to start.\")\n")
+    code.append("                # Dump logs for debugging\n")
+    code.append("                if os.path.exists('minio.log'):\n")
+    code.append("                    print('--- MINIO LOG ---')\n")
+    code.append("                    print(open('minio.log').read())\n")
+    code.append("                if os.path.exists('es.log'):\n")
+    code.append("                    print('--- ES LOG ---')\n")
+    code.append("                    print(open('es.log').read())\n")
+    code.append("                if os.path.exists('cassandra.log'):\n")
+    code.append("                    print('--- CASSANDRA LOG ---')\n")
+    code.append("                    print(open('cassandra.log').read())\n")
+    code.append("                raise Exception(f\"Service at {host}:{port} failed to start.\")\n")
     code.append("            time.sleep(2)\n")
     code.append("\n")
     code.append("# Wait for services\n")
-    code.append("if 'kafka' in locals() or 'kafka' in globals(): wait_for_port(9092) # Kafka\n")
-    code.append("wait_for_port(9042) # Cassandra\n")
-    code.append("time.sleep(10) # Extra buffer for Cassandra to be fully ready")
+    if "kafka" in services: code.append("wait_for_port(9092) # Kafka\n")
+    if "cassandra" in services: 
+        code.append("wait_for_port(9042) # Cassandra\n")
+        code.append("time.sleep(10) # Extra buffer for Cassandra\n")
+    if "minio" in services: 
+        code.append("wait_for_port(9000) # MinIO\n")
+        code.append("time.sleep(5) # Extra buffer for MinIO\n")
+    if "es" in services: code.append("wait_for_port(9200) # Elasticsearch\n")
+    if "redis" in services: code.append("wait_for_port(6379) # Redis\n")
+    if "mongo" in services: code.append("wait_for_port(27017) # MongoDB\n")
     return [
         {"cell_type": "markdown", "metadata": {}, "source": ["\n".join(desc)]},
         {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": code}
@@ -189,17 +205,35 @@ def get_nb61():
             "execution_count": None,
             "metadata": {},
             "source": [
+                "import threading\n",
+                "import time, json, random\n",
                 "from kafka import KafkaProducer\n",
-                "import json, time, random\n",
-                "print(\"Starting Bid Simulator...\")\n",
-                "producer = KafkaProducer(bootstrap_servers='localhost:9092')\n",
-                "print(\"Sending 500 bid requests...\")\n",
-                "for _ in range(500):\n",
-                "    bid = {'bid_id': f'b{_}', 'user_id': f'u{random.randint(1,10)}', 'site': 'example.com', 'bid_floor': random.uniform(0.1, 1.0)}\n",
-                "    producer.send('input-topic', json.dumps(bid).encode('utf-8'))\n",
-                "    time.sleep(0.01)\n",
-                "producer.flush()\n",
-                "print(\"Producer finished.\")"
+                "\n",
+                "def send_data():\n",
+                "    producer = None\n",
+                "    # Retry connection\n",
+                "    while not producer:\n",
+                "        try:\n",
+                "            producer = KafkaProducer(bootstrap_servers='localhost:9092')\n",
+                "        except Exception as e:\n",
+                "            print(f\"Waiting for Kafka... {e}\")\n",
+                "            time.sleep(2)\n",
+                "    \n",
+                "    # Send Loop\n",
+                "    while True:\n",
+                "        try:\n",
+                "            bid = {'bid_id': f'b{random.randint(1000,99999)}', 'user_id': f'u{random.randint(1,10)}', 'site': 'example.com', 'bid_floor': random.uniform(0.1, 1.0)}\n",
+                "            producer.send('input-topic', json.dumps(bid).encode('utf-8'))\n",
+                "            time.sleep(0.1)\n",
+                "        except Exception as e:\n",
+                "            print(f\"Producer Error: {e}\")\n",
+                "            time.sleep(1)\n",
+                "\n",
+                "print(\"Starting Bid Simulator (Background Thread)...\")\n",
+                "t = threading.Thread(target=send_data)\n",
+                "t.daemon = True\n",
+                "t.start()\n",
+                "print(\"Producer running continuously...\")"
             ]
         },
         {
@@ -210,6 +244,7 @@ def get_nb61():
     ]
     spark_code = [
         "from pyspark.sql import SparkSession\n",
+        "import json\n",
         "from pyspark.sql.functions import col, from_json\n",
         "from pyspark.sql.types import StructType, StructField, StringType, FloatType\n",
         "import redis\n",
@@ -249,7 +284,7 @@ def get_nb61():
         "    print(f\"Batch {epoch_id} processed {len(rows)} logic. Decisions logged to Cassandra.\")\n",
         "\n",
         "print(\"Starting Spark Streaming Job...\")\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(30)\n",
         "print(\"Spark Job Finished.\")"
@@ -291,7 +326,37 @@ def get_nb61():
 
 # 62: Smart City Traffic
 def get_nb62():
-    setup = get_service_start_block(["kafka", "redis", "minio"])
+    # Remove default "minio" from standard block to provide custom setup
+    setup = get_service_start_block(["kafka", "redis"])
+    
+    # Custom MinIO Start on Port 9010
+    minio_custom = {
+        "cell_type": "code",
+        "metadata": {},
+        "source": [
+            "# Start MinIO on Custom Port 9010 to avoid conflicts\n",
+            "!wget -q https://dl.min.io/server/minio/release/linux-amd64/minio\n",
+            "!chmod +x minio\n",
+            "!mkdir -p /content/minio_data_nb62\n",
+            "!MINIO_ROOT_USER=minioadmin MINIO_ROOT_PASSWORD=minioadmin ./minio server /content/minio_data_nb62 --address \":9010\" --console-address \":9011\" &> minio_9010.log &\n",
+            "\n",
+            "# Wait for MinIO 9010\n",
+            "import time, socket, os\n",
+            "print('Waiting for MinIO on 9010...')\n",
+            "start = time.time()\n",
+            "while True:\n",
+            "    try:\n",
+            "        with socket.create_connection(('localhost', 9010), timeout=1): break\n",
+            "    except (OSError, ConnectionRefusedError):\n",
+            "        if time.time() - start > 120:\n",
+            "             if os.path.exists('minio_9010.log'): print(open('minio_9010.log').read())\n",
+            "             raise Exception('MinIO 9010 Failed')\n",
+            "        time.sleep(1)\n",
+            "print('MinIO 9010 Ready!')"
+        ]
+    }
+    setup.append(minio_custom)
+
     logic = [
         {
             "cell_type": "markdown",
@@ -318,7 +383,7 @@ def get_nb62():
         {
             "cell_type": "markdown",
             "metadata": {},
-            "source": ["## 5. Traffic Control Pipeline\n\n1. Calcs Avg Speed per batch.\n2. Updates Traffic Light status in Redis (Green/Red).\n3. Archives raw batch to MinIO."]
+            "source": ["## 5. Traffic Control Pipeline\n\n1. Calcs Avg Speed per batch.\n2. Updates Traffic Light status in Redis (Green/Red).\n3. Archives raw batch to MinIO (Port 9010)."]
         }
     ]
     spark_code = [
@@ -326,8 +391,8 @@ def get_nb62():
         "import redis, json\n",
         "from minio import Minio\n",
         "\n",
-        "# Init MinIO\n",
-        "m_client = Minio(\"127.0.0.1:9000\", access_key=\"minioadmin\", secret_key=\"minioadmin\", secure=False)\n",
+        "# Init MinIO (Port 9010)\n",
+        "m_client = Minio(\"127.0.0.1:9010\", access_key=\"minioadmin\", secret_key=\"minioadmin\", secure=False)\n",
         "if not m_client.bucket_exists(\"traffic-archive\"): m_client.make_bucket(\"traffic-archive\")\n",
         "\n",
         "spark = SparkSession.builder.appName(\"SmartCity\").getOrCreate()\n",
@@ -351,7 +416,7 @@ def get_nb62():
         "    print(f\"Batch {epoch_id}: Avg Speed {avg_speed:.1f} -> {status}. Archived to MinIO.\")\n",
         "\n",
         "print(\"Starting Spark Streaming Job...\")\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(30)\n",
         "print(\"Spark Job Finished.\")"
@@ -431,7 +496,7 @@ def get_nb63():
         "    print(f\"Batch {epoch_id} processed: Analyzed security events.\")\n",
         "\n",
         "print(\"Starting Spark Streaming Job...\")\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(30)\n",
         "print(\"Spark Job Finished.\")"
@@ -494,7 +559,7 @@ def get_nb64():
     ]
     spark_code = [
         "from pyspark.sql import SparkSession\n",
-        "import redis\n",
+        "import redis, json\n",
         "from pymongo import MongoClient\n",
         "\n",
         "# Setup Inventory\n",
@@ -522,7 +587,7 @@ def get_nb64():
         "    print(f\"Batch {epoch_id} processed: Inventory updated & Orders recorded.\")\n",
         "\n",
         "print(\"Starting Spark Streaming Job...\")\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(30)\n",
         "print(\"Spark Job Finished.\")"
@@ -583,7 +648,7 @@ def get_nb65():
     ]
     spark_code = [
         "from pyspark.sql import SparkSession\n",
-        "import redis\n",
+        "import redis, json\n",
         "\n",
         "spark = SparkSession.builder.appName(\"Social\").getOrCreate()\n",
         "\n",
@@ -596,7 +661,7 @@ def get_nb65():
         "    print(f\"Batch {epoch_id} updated counts in Redis.\")\n",
         "\n",
         "print(\"Starting Spark Streaming Job...\")\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(30)\n",
         "print(\"Spark Job Finished.\")"
@@ -674,7 +739,7 @@ def get_nb66():
         "    print(f\"Batch {epoch_id} processed.\")\n",
         "\n",
         "print(\"Starting Spark Streaming Job...\")\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(30)\n",
         "print(\"Spark Job Finished.\")"
@@ -755,7 +820,7 @@ def get_nb67():
         "    print(f\"Batch {epoch_id} processed: Archived to Mongo & Alerts checked.\")\n",
         "\n",
         "print(\"Starting Spark Streaming Job...\")\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(30)\n",
         "print(\"Spark Job Finished.\")"
@@ -831,7 +896,7 @@ def get_nb68():
         "    print(f\"Batch {epoch_id} updated locations.\")\n",
         "\n",
         "print(\"Starting Spark Streaming Job...\")\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(30)\n",
         "print(\"Spark Job Finished.\")"
@@ -908,7 +973,7 @@ def get_nb69():
         "    print(f\"Batch {epoch_id} processed.\")\n",
         "\n",
         "print(\"Starting Spark Streaming Job...\")\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(30)\n",
         "print(\"Spark Job Finished.\")"
@@ -967,6 +1032,7 @@ def get_nb70():
     ]
     spark_code = [
         "from pyspark.sql import SparkSession\n",
+        "import json\n",
         "from pymongo import MongoClient\n",
         "from elasticsearch import Elasticsearch\n",
         "\n",
@@ -985,7 +1051,7 @@ def get_nb70():
         "    print(f\"Batch {epoch_id} replicated to Mongo & ES\")\n",
         "\n",
         "print(\"Starting Spark Streaming Job...\")\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(30)\n",
         "print(\"Spark Job Finished.\")"

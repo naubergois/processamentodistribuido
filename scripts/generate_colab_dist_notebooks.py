@@ -66,8 +66,8 @@ def get_service_start_block(services):
         desc.append("- **Kafka & Zookeeper**: Event streaming platform.")
         code.extend([
             "# Start Kafka\n",
-            "!!./kafka_2.13-3.6.1/bin/zookeeper-server-start.sh -daemon ./kafka_2.13-3.6.1/config/zookeeper.properties\n",
-            "!!./kafka_2.13-3.6.1/bin/kafka-server-start.sh -daemon ./kafka_2.13-3.6.1/config/server.properties\n"
+            "!./kafka_2.13-3.6.1/bin/zookeeper-server-start.sh -daemon ./kafka_2.13-3.6.1/config/zookeeper.properties\n",
+            "!./kafka_2.13-3.6.1/bin/kafka-server-start.sh -daemon ./kafka_2.13-3.6.1/config/server.properties\n"
         ])
     if "redis" in services:
         desc.append("- **Redis**: In-memory data store.")
@@ -94,17 +94,15 @@ def get_service_start_block(services):
             "!wget -q https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.10.2-linux-x86_64.tar.gz\n",
             "!tar -xzf elasticsearch-7.10.2-linux-x86_64.tar.gz\n",
             "!chown -R daemon:daemon elasticsearch-7.10.2\n",
-            "!!sudo -u daemon ES_JAVA_OPTS=\"-Xms512m -Xmx512m\" ./elasticsearch-7.10.2/bin/elasticsearch -d\n"
+            "!sudo -u daemon ES_JAVA_OPTS=\"-Xms512m -Xmx512m\" ./elasticsearch-7.10.2/bin/elasticsearch -d > es.log 2>&1 &\n"
         ])
     if "cassandra" in services:
         desc.append("- **Cassandra**: Wide-column store.")
         code.extend([
             "# Start Cassandra\n",
-            "!echo \"deb http://www.apache.org/dist/cassandra/debian 40x main\" | tee -a /etc/apt/sources.list.d/cassandra.sources.list\n",
-            "!curl https://downloads.apache.org/cassandra/KEYS | apt-key add -\n",
-            "!apt-get update -qq > /dev/null\n",
-            "!apt-get install cassandra -qq > /dev/null\n",
-            "!service cassandra start\n"
+            "!wget -q https://archive.apache.org/dist/cassandra/4.1.3/apache-cassandra-4.1.3-bin.tar.gz\n",
+            "!tar xf apache-cassandra-4.1.3-bin.tar.gz\n",
+            "!apache-cassandra-4.1.3/bin/cassandra -R > cassandra.log 2>&1 &\n"
         ])
     if "minio" in services:
         desc.append("- **MinIO**: S3-compatible object storage.")
@@ -112,10 +110,46 @@ def get_service_start_block(services):
             "# Start MinIO\n",
             "!wget -q https://dl.min.io/server/minio/release/linux-amd64/minio\n",
             "!chmod +x minio\n",
-            "!./minio server /data --console-address \":9001\" &> minio.log &\n"
+            "!mkdir -p /content/minio_data\n",
+            "!MINIO_ROOT_USER=minioadmin MINIO_ROOT_PASSWORD=minioadmin ./minio server /content/minio_data --console-address \":9001\" &> minio.log &\n"
         ])
     
-    code.append("\nimport time\ntime.sleep(30) # Wait for startup")
+    
+    code.append("\nimport time, socket, os\n")
+    code.append("def wait_for_port(port, host='localhost', timeout=120):\n")
+    code.append("    start_time = time.time()\n")
+    code.append("    while True:\n")
+    code.append("        try:\n")
+    code.append("            with socket.create_connection((host, port), timeout=1):\n")
+    code.append("                print(f\"Service at {host}:{port} is ready!\")\n")
+    code.append("                return True\n")
+    code.append("        except (OSError, ConnectionRefusedError):\n")
+    code.append("            if time.time() - start_time > timeout:\n")
+    code.append("                print(f\"Timeout waiting for {host}:{port} to start.\")\n")
+    code.append("                # Dump logs for debugging\n")
+    code.append("                if os.path.exists('minio.log'):\n")
+    code.append("                    print('--- MINIO LOG ---')\n")
+    code.append("                    print(open('minio.log').read())\n")
+    code.append("                if os.path.exists('es.log'):\n")
+    code.append("                    print('--- ES LOG ---')\n")
+    code.append("                    print(open('es.log').read())\n")
+    code.append("                if os.path.exists('cassandra.log'):\n")
+    code.append("                    print('--- CASSANDRA LOG ---')\n")
+    code.append("                    print(open('cassandra.log').read())\n")
+    code.append("                raise Exception(f\"Service at {host}:{port} failed to start.\")\n")
+    code.append("            time.sleep(2)\n")
+    code.append("\n")
+    code.append("# Wait for services\n")
+    if "kafka" in services: code.append("wait_for_port(9092) # Kafka\n")
+    if "cassandra" in services: 
+        code.append("wait_for_port(9042) # Cassandra\n")
+        code.append("time.sleep(10) # Extra buffer for Cassandra\n")
+    if "minio" in services: 
+        code.append("wait_for_port(9000) # MinIO\n")
+        code.append("time.sleep(5) # Extra buffer for MinIO\n")
+    if "es" in services: code.append("wait_for_port(9200) # Elasticsearch\n")
+    if "redis" in services: code.append("wait_for_port(6379) # Redis\n")
+    if "mongo" in services: code.append("wait_for_port(27017) # MongoDB\n")
     return [
         {"cell_type": "markdown", "metadata": {}, "source": ["\n".join(desc)]},
         {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": code}
@@ -290,7 +324,7 @@ def get_nb52():
         "    session_local.shutdown()\n",
         "    print(f\"Batch {epoch_id} persisted.\")\n",
         "\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(30)"
     ]
@@ -366,7 +400,7 @@ def get_nb53():
         "    print(f\"Batch {epoch_id} processed: {len(rows)} logs indexed.\")\n",
         "\n",
         "print(\"Starting Spark Streaming Job...\")\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(30)\n",
         "print(\"Spark Job Finished.\")"
@@ -443,7 +477,7 @@ def get_nb54():
         "    print(f\"Batch {epoch_id} uploaded to MinIO.\")\n",
         "\n",
         "print(\"Starting Spark Streaming Job...\")\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(30)\n",
         "print(\"Spark Job Finished.\")"
@@ -521,7 +555,7 @@ def get_nb55():
         "         name = r_local.get(f\"user:{uid}\")\n",
         "         if name: print(f\"Enriched: {uid} -> {name.decode('utf-8')}\")\n",
         "\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(20)"
     ]
@@ -593,7 +627,7 @@ def get_nb56():
         "    print(f\"Batch {epoch_id} inserted into MongoDB.\")\n",
         "\n",
         "print(\"Starting Spark Streaming Job...\")\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(20)\n",
         "print(\"Spark Job Finished.\")"
@@ -674,7 +708,7 @@ def get_nb57():
         "    print(f\"Batch {epoch_id} routed.\")\n",
         "\n",
         "print(\"Starting Spark Streaming Job...\")\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(30)\n",
         "print(\"Spark Job Finished.\")"
@@ -755,7 +789,7 @@ def get_nb58():
         "        r.set(f\"loc:{d['user']}\", d['loc'])\n",
         "    \n",
         "print(\"Starting Spark Fraud Detector...\")\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(20)\n",
         "print(\"Spark Job Finished.\")"
@@ -834,7 +868,7 @@ def get_nb59():
         "        print(f\"Batch {epoch_id}: Updates sent to Cassandra.\")\n",
         "\n",
         "print(\"Starting Spark Streaming Job...\")\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(30)\n",
         "print(\"Spark Job Finished.\")"
@@ -913,7 +947,7 @@ def get_nb60():
         "    print(f\"Batch {epoch_id} pipeline processed\")\n",
         "\n",
         "print(\"Starting Spark Streaming Job...\")\n",
-        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").load()\n",
+        "df = spark.readStream.format(\"kafka\").option(\"kafka.bootstrap.servers\", \"localhost:9092\").option(\"subscribe\", \"input-topic\").option(\"startingOffsets\", \"earliest\").load()\n",
         "query = df.selectExpr(\"CAST(value AS STRING)\").writeStream.foreachBatch(process_batch).start()\n",
         "query.awaitTermination(30)\n",
         "print(\"Spark Job Finished.\")"
