@@ -879,7 +879,34 @@ def get_nb67():
 
 # 68: Supply Chain
 def get_nb68():
-    setup = get_service_start_block(["kafka", "redis", "minio"])
+    # Helper for Custom MinIO Setup (Port 9010)
+    setup = get_service_start_block(["kafka", "redis"])
+    minio_custom = {
+        "cell_type": "code",
+        "metadata": {},
+        "source": [
+            "# Start MinIO on Custom Port 9010 (Shared with NB62/NB63 convention)\n",
+            "!wget -q https://dl.min.io/server/minio/release/linux-amd64/minio\n",
+            "!chmod +x minio\n",
+            "!mkdir -p /content/minio_data_nb68\n",
+            "!MINIO_ROOT_USER=minioadmin MINIO_ROOT_PASSWORD=minioadmin ./minio server /content/minio_data_nb68 --address \":9010\" --console-address \":9011\" &> minio_9010.log &\n",
+            "\n",
+            "# Wait for MinIO 9010\n",
+            "import time, socket, os\n",
+            "print('Waiting for MinIO on 9010...')\n",
+            "start = time.time()\n",
+            "while True:\n",
+            "    try:\n",
+            "        with socket.create_connection(('localhost', 9010), timeout=1): break\n",
+            "    except (OSError, ConnectionRefusedError):\n",
+            "        if time.time() - start > 120:\n",
+            "             if os.path.exists('minio_9010.log'): print(open('minio_9010.log').read())\n",
+            "             raise Exception('MinIO 9010 Failed')\n",
+            "        time.sleep(1)\n",
+            "print('MinIO 9010 Ready!')"
+        ]
+    }
+    setup.append(minio_custom)
     logic = [
         {
             "cell_type": "markdown",
