@@ -509,6 +509,10 @@ def get_nb63():
     ]
     spark_code = [
         "from pyspark.sql import SparkSession\n",
+        "import numpy as np\n",
+        "try:\n",
+        "    np.float_ = np.float64\n",
+        "except: pass\n",
         "from elasticsearch import Elasticsearch\n",
         "import json\n",
         "\n",
@@ -542,6 +546,10 @@ def get_nb63():
             "execution_count": None,
             "metadata": {},
             "source": [
+                "import numpy as np\n",
+                "try:\n",
+                "    np.float_ = np.float64\n",
+                "except: pass\n",
                 "from elasticsearch import Elasticsearch\n",
                 "es = Elasticsearch(['http://localhost:9200'])\n",
                 "time.sleep(2)\n",
