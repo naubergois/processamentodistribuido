@@ -118,3 +118,55 @@ The scripts persist data to:
 ### Material Extra
 - **Kafka Avançado (Deep Dive)**: Tutorial detalhado sobre arquitetura Kafka (Log, Partições, Consumer Groups, Semântica de Entrega) - `notebooks/Kafka_Avancado_Colab.ipynb`
 
+### Phase 9: Distributed Pipelines (Colab Optimized)
+These 20 notebooks (NB51-NB70) are specifically designed to run **full distributed pipelines inside Google Colab**. Each notebook sets up its own environment (Kafka, Spark, Redis, Mongo, Cassandra, Elasticsearch, MinIO) and executes a complete streaming logic (Producer -> Spark -> Sink).
+**New Features (v2):**
+- **Automated Verification**: End-of-notebook cells programmatically verify output (JSON/DB/Logs).
+- **Progress Visibility**: Clear "Starting...", "Processing...", "Finished" logs for all Producers and Consumers.
+- **Robust Startup**: Intelligent port checking ensures services (Cassandra, Kafka) are fully ready before execution.
+- **Dependency Fixes**: Pinned versions (e.g., `numpy<2.0.0`) to ensure compatibility with all libraries.
+
+**Batch 1: Core Technologies (NB51-NB60)**
+- **NB51**: Kafka & Spark Basics (Streaming Hello World)
+- **NB52**: Spark + Cassandra (Time Series Sensor Data)
+- **NB53**: Spark + Elasticsearch (Log Analysis Pipeline)
+- **NB54**: Spark + MinIO (Data Lake / S3 Sink)
+- **NB55**: Spark + Redis (Low-latency Enrichment)
+- **NB56**: Spark + MongoDB (Document Sink)
+- **NB57**: Hot (ES) vs Cold (MinIO) Architecture
+- **NB58**: Fraud Detection with Redis State
+- **NB59**: IoT Aggregation to Cassandra
+- **NB60**: End-to-End Pipeline (Valid -> Mongo, Invalid -> DLQ)
+
+**Batch 2: Full Solution Pipelines (NB61-NB70)**
+- **NB61**: **AdTech Bidding**: Bid Requests -> User Profile Lookup (Redis) -> Bid Decision -> Log (Cassandra).
+- **NB62**: **Smart City**: Traffic Sensors -> Avg Speed Aggregation -> Traffic Light Control (Redis) + Archival (MinIO).
+- **NB63**: **SIEM Security**: Logs -> Severity Filter -> Alert Indexing (ES) + Cold Storage (MinIO).
+- **NB64**: **E-commerce**: Orders -> Inventory Check (Redis) -> Fulfillment (Mongo) or Fail.
+- **NB65**: **Social Sentiment**: Stream -> Sentiment Calc -> Dashboard Stats (Redis) + Search Index (ES).
+- **NB66**: **Banking Fraud**: Transactions -> Historical Feature Lookup (Cassandra) -> ML Rules -> Alert PubSub (Redis).
+- **NB67**: **Healthcare**: Vitals -> Windowed Avg -> Patient History (Mongo) + Real-time Alert (Redis).
+- **NB68**: **Supply Chain**: RFID Events -> Path Validation (Redis) -> Audit Log (MinIO).
+- **NB69**: **Gaming Ops**: Telemetry -> Cheat Detection logic -> Ban List (Redis) + Replay Store (Cassandra).
+- **NB70**: **Multi-Cloud**: On-Prem Stream -> Replication to Object Store (MinIO) + NoSQL (Mongo) + Search (ES).
+
+## Upload to Google Drive
+
+To easily run these notebooks in Google Colab, you can upload them to your Google Drive automatically.
+
+1.  **Dependencies**: Install the upload script requirements:
+    ```bash
+    pip install -r scripts/requirements_drive.txt
+    ```
+
+2.  **Credentials**: 
+    - Download your OAuth 2.0 Client ID JSON from Google Cloud Console.
+    - Save it as `scripts/client_secrets.json`.
+
+3.  **Run Upload**:
+    ```bash
+    python3 scripts/upload_to_drive.py
+    ```
+    - The first run will open a browser for authentication.
+    - It creates a folder `Colab_Notebooks` (or uses one defined in `scripts/.env`).
+

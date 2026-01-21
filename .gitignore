@@ -33,3 +33,12 @@ checkpoint/
 .vscode/
 .idea/
 *.swp
+
+# Secrets and Config
+scripts/.env
+scripts/client_secrets.json
+scripts/token.pickle
+scripts/token.json
+client_secrets.json
+token.pickle
+token.json

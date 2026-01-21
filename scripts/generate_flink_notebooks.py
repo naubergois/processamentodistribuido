@@ -49,6 +49,17 @@ def create_notebook(filename, title, description, code_cells):
             "source": cell_source
         })
 
+    # Add Verification Cell for Flink (Console Output)
+    notebook["cells"].append({
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## Verification\n",
+            "These Flink jobs use a `print` sink, which outputs results directly to the cell output above (Standard Output). check the logs in the running cell to verify the processed data."
+        ]
+    })
+
+
     with open(f"notebooks/{filename}", 'w') as f:
         json.dump(notebook, f, indent=1)
     print(f"Generated {filename}")
