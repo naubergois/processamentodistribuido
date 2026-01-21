@@ -1135,7 +1135,7 @@ def get_nb70():
         "    mongo = MongoClient()\n",
         "    es = Elasticsearch(['http://localhost:9200'])\n",
         "    for row in rows:\n",
-        "        val = row.value.decode('utf-8')\n",
+        "        val = row.value\n",
         "        # Replicate\n",
         "        mongo.cloud.replica.insert_one({'val': val})\n",
         "        es.index(index='replica', body={'val': val})\n",
